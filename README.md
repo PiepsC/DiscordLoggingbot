@@ -1,0 +1,2 @@
+# DiscordLoggingbot
+Simple discord logbot
