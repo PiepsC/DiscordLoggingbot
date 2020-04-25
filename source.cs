@@ -21,6 +21,8 @@ namespace Utilities
         public string author;
         public string date;
         public string filename;
+        public int bytesize;
+        public bool displayable;
     }
     public class RecordBook {
         public List<FileRecord> records = new List<FileRecord>();
@@ -44,15 +46,16 @@ namespace Logbot
         Dictionary<string, Tuple<bool, MethodInfo>> cmds;
         Utilities.RecordBook records;
         #region boringVars
-        private string _discordToken = "discordkey";
+        private string _discordToken = "botsecret";
         //Directory to where logs must be stored
-        private string _logdir = @"pathlogdir";
+        private string _logdir = @"Pathtologdir";
         //Base directory of the bot
-        private string _basedir =  @"pathbasedir";
+        private string _basedir =  @"Pathtodir";
         //Base file extension for WIN users
         private string _suffix = ".txt";
         private string _mdprefix = @"```Markdown";
         private string _mdsuffix = @"```";
+        private int _MAXDISCORDLENGTH = 1950; //Max amount of characters before Discord denies the message
         #endregion
         private DiscordSocketClient _client;
         private ISocketMessageChannel channel;
@@ -107,6 +110,8 @@ namespace Logbot
             }
             WebClient client = new WebClient();
             string content = Encoding.UTF8.GetString(client.DownloadData(url));
+            int contentSize = content.Length + _mdprefix.Length + _mdsuffix.Length;
+            bool displayable = contentSize < _MAXDISCORDLENGTH;
             using(StreamWriter outPut = File.AppendText(tar))
             {
                 outPut.WriteLine(_mdprefix);
@@ -117,7 +122,9 @@ namespace Logbot
             records.records.Add(new Utilities.FileRecord(){
                 author = user,
                 filename = filename,
-                date = date
+                date = date,
+                bytesize = contentSize,
+                displayable = displayable
             });
             RewriteJson();
             await this.channel.SendMessageAsync($"File with name '{filename}' has been created!");
@@ -146,7 +153,7 @@ namespace Logbot
                 return;
             }
             string content = File.ReadAllText(tar);
-            if(content.Length > 1900)
+            if(content.Length > _MAXDISCORDLENGTH)
                 await this.channel.SendFileAsync(tar);
             else
                 await this.channel.SendMessageAsync(File.ReadAllText(tar));
@@ -174,13 +181,13 @@ namespace Logbot
                 return;
             }
             string content = File.ReadAllText(tar);
-            if(content.Length > 1900)
+            if(content.Length > _MAXDISCORDLENGTH)
                 await this.channel.SendFileAsync(tar);
             else
                 await this.channel.SendMessageAsync(File.ReadAllText(tar));
         }
 
-        [Utilities.CustomCommand("author", true)]
+        [Utilities.CustomCommand("info", true)]
         public async Task ShowAuthor(params Object[] args)
         {
             Task<bool> c = ReqParam(1, ((Object[])args[0]).Length);
@@ -194,7 +201,7 @@ namespace Logbot
                 await this.channel.SendMessageAsync($"File with name '{filename}' does not exists!");
                 return;
             }
-            string response = $"{filename} was written by {records.records[index].author} at {records.records[index].date}";
+            string response = $"{filename} was written by {records.records[index].author} at {records.records[index].date}. Displayable : {records.records[index].displayable}. Length: {records.records[index].bytesize}";
             await this.channel.SendMessageAsync(response);
         }
 
@@ -214,7 +221,7 @@ namespace Logbot
             int count = 0;
             foreach(Utilities.FileRecord f in records.records)
             {
-                response = response + $"[{count}] {f.filename} - Written by {f.author}\n";
+                response = response + $"[{count}] {f.filename} - Written by {f.author} ({(f.displayable ? "short" : "long")})\n";
                 ++count;
             }
             response = response + "```";
@@ -259,6 +266,18 @@ namespace Logbot
 
             string mdlink = @"https://support.discordapp.com/hc/en-us/articles/210298617-Tekst-opmaken-met-markdown-dikgedrukt-cursief-onderlijnen-";
             await this.channel.SendMessageAsync(mdlink);
+        }
+
+        [Utilities.CustomCommand("source", true)]
+        public async Task ShowSource(params Object[] args)
+        {
+            Task<bool> c = ReqParam(0, ((Object[])args[0]).Length);
+            await c;
+            if(!c.Result)
+                return;
+
+            string sclink = @"https://github.com/PiepsC/DiscordLoggingbot.git";
+            await this.channel.SendMessageAsync(sclink);
         }
         
         [Utilities.CustomCommand("help", true)]
@@ -345,7 +364,9 @@ namespace Logbot
                 records.records.Add(new Utilities.FileRecord(){
                     author = s.author,
                     filename = s.filename,
-                    date = s.date
+                    date = s.date,
+                    bytesize = s.bytesize,
+                    displayable = s.displayable
                 });
             }
         }
